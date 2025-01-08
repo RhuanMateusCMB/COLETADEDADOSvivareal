@@ -289,7 +289,7 @@ class ScraperVivaReal:
                 continue
         return None
 
-    def coletar_dados(self, num_paginas: int = 10) -> Optional[pd.DataFrame]:
+    def coletar_dados(self, num_paginas: int = 5) -> Optional[pd.DataFrame]:
         navegador = None
         todos_dados: List[Dict] = []
         id_global = 0
