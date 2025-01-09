@@ -403,7 +403,7 @@ def main():
         # Informações sobre a coleta
         st.info("""
         ℹ️ **Informações sobre a coleta:**
-        - Serão coletadas 10 páginas de resultados
+        - Serão coletadas 5 páginas de resultados
         - Apenas terrenos em Eusébio/CE
         - Após a coleta, você pode escolher se deseja salvar os dados no banco
         """)
