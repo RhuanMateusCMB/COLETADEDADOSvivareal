@@ -22,6 +22,9 @@ from dataclasses import dataclass
 # Biblioteca para conexão com Supabase
 from supabase import create_client
 
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service as ChromeService
+
 # Configuração da página Streamlit
 st.set_page_config(
     page_title="CMB - Capital",
@@ -94,11 +97,10 @@ class ScraperVivaReal:
             opcoes_chrome = Options()
             opcoes_chrome.add_argument('--headless=new')
             opcoes_chrome.add_argument('--no-sandbox')
-            opcoes_chrome.add_argument('--disable-dev-shm-usage') 
+            opcoes_chrome.add_argument('--disable-dev-shm-usage')
             opcoes_chrome.add_argument('--disable-gpu')
-            opcoes_chrome.binary_location = "/usr/bin/google-chrome"  # Altere para o caminho correto
             
-            service = Service()  # Remova o path fixo do chromedriver
+            service = ChromeService(ChromeDriverManager().install())
             navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
             
             navegador.set_page_load_timeout(45)
