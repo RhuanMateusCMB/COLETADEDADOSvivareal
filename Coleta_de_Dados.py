@@ -90,32 +90,24 @@ class ScraperVivaReal:
         return logging.getLogger(__name__)
 
     def _configurar_navegador(self) -> webdriver.Chrome:
-       try:
-           opcoes_chrome = Options()
-           # opcoes_chrome.add_argument('--headless=new') # Remover headless para debug
-           opcoes_chrome.add_argument('--no-sandbox')
-           opcoes_chrome.add_argument('--disable-dev-shm-usage')
-           opcoes_chrome.add_argument('--disable-gpu')
-           opcoes_chrome.add_argument('--window-size=1920,1080')
-           opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
-           opcoes_chrome.add_argument('--enable-cookies')
-           opcoes_chrome.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-    
-           service = Service("/usr/bin/chromedriver")
-           navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
-           navegador.set_page_load_timeout(45)
-           navegador.implicitly_wait(30)
-           
-           navegador.execute_cdp_cmd('Network.setUserAgentOverride', {
-               "userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-           })
-           navegador.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-           
-           return navegador
-           
-       except Exception as e:
-           self.logger.error(f"Erro ao configurar navegador: {str(e)}")
-           return None
+        try:
+            opcoes_chrome = Options()
+            opcoes_chrome.add_argument('--headless=new')
+            opcoes_chrome.add_argument('--no-sandbox')
+            opcoes_chrome.add_argument('--disable-dev-shm-usage') 
+            opcoes_chrome.add_argument('--disable-gpu')
+            opcoes_chrome.binary_location = "/usr/bin/google-chrome"  # Altere para o caminho correto
+            
+            service = Service()  # Remova o path fixo do chromedriver
+            navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
+            
+            navegador.set_page_load_timeout(45)
+            navegador.implicitly_wait(30)
+            
+            return navegador
+        except Exception as e:
+            self.logger.error(f"Erro ao configurar navegador: {str(e)}")
+            return None
 
     def _capturar_localizacao(self, navegador: webdriver.Chrome) -> tuple:
         if navegador is None:
