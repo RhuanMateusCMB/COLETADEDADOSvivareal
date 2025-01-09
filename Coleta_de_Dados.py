@@ -46,9 +46,9 @@ st.markdown("""
 
 @dataclass
 class ConfiguracaoScraper:
-    tempo_espera: int = 45
-    pausa_rolagem: int = 8
-    espera_carregamento: int = 15
+    tempo_espera: int = 20
+    pausa_rolagem: int = 3
+    espera_carregamento: int = 5
     url_base: str = "https://www.vivareal.com.br/venda/ceara/eusebio/lote-terreno_residencial/#onde=,Cear%C3%A1,Eus%C3%A9bio,,,,,city,BR%3ECeara%3ENULL%3EEusebio,-14.791623,-39.283324,&itl_id=1000183&itl_name=vivareal_-_botao-cta_buscar_to_vivareal_resultado-pesquisa"
     tentativas_max: int = 3
 
@@ -95,28 +95,10 @@ class ScraperVivaReal:
             opcoes_chrome.add_argument('--headless=new')
             opcoes_chrome.add_argument('--no-sandbox')
             opcoes_chrome.add_argument('--disable-dev-shm-usage')
-            opcoes_chrome.add_argument('--disable-gpu')
             opcoes_chrome.add_argument('--window-size=1920,1080')
-            opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
-            opcoes_chrome.add_argument('--enable-cookies')
-            opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
-            opcoes_chrome.add_experimental_option('excludeSwitches', ['enable-automation'])
-            opcoes_chrome.add_experimental_option('useAutomationExtension', False)
-            opcoes_chrome.binary_location = "/usr/bin/chromium"
             
             service = Service("/usr/bin/chromedriver")
             navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
-
-            # Usando webdriver_manager para gerenciar o ChromeDriver automaticamente
-            #from webdriver_manager.chrome import ChromeDriverManager
-            #from selenium.webdriver.chrome.service import Service as ChromeService
-            
-            #service = ChromeService(ChromeDriverManager().install())
-            #navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
-            navegador.execute_cdp_cmd('Network.setUserAgentOverride', {
-                "userAgent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            })
-            navegador.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
             return navegador
         except Exception as e:
@@ -124,13 +106,10 @@ class ScraperVivaReal:
             return None
 
     def _capturar_localizacao(self, navegador: webdriver.Chrome) -> tuple:
-        if navegador is None:
-            return None, None
-            
         try:
-            # Aguarda a página carregar completamente
-            time.sleep(self.config.espera_carregamento * 2)  # Aumentando o tempo de espera
-            
+            # Espera a página carregar completamente
+            time.sleep(self.config.espera_carregamento)
+
             # Primeira tentativa: buscar pelo seletor CSS
             try:
                 localizacao_elemento = WebDriverWait(navegador, self.config.tempo_espera).until(
@@ -163,120 +142,51 @@ class ScraperVivaReal:
             time.sleep(self.config.pausa_rolagem)
 
     def _extrair_dados_imovel(self, imovel: webdriver.remote.webelement.WebElement,
-                         id_global: int, pagina: int) -> Optional[Dict]:
-        for tentativa in range(3):  # 3 tentativas para cada imóvel
-            try:
-                # Funções auxiliares para conversão
-                def converter_preco(texto: str) -> float:
-                    try:
-                        numero = texto.replace('R$', '').replace('.', '').replace(',', '.').strip()
-                        return float(numero)
-                    except (ValueError, AttributeError):
-                        self.logger.warning(f"Erro ao converter preço: {texto}")
-                        return 0.0
+                    id_global: int, pagina: int) -> Optional[Dict]:
+        try:
+            # Extrai o texto dos elementos
+            preco_texto = imovel.find_element(By.CSS_SELECTOR, 'div.property-card__price').text
+            area_texto = imovel.find_element(By.CSS_SELECTOR, 'span.property-card__detail-area').text
 
-                def converter_area(texto: str) -> float:
-                    try:
-                        numero = texto.replace('m²', '').replace(',', '.').strip()
-                        return float(numero)
-                    except (ValueError, AttributeError):
-                        self.logger.warning(f"Erro ao converter área: {texto}")
-                        return 0.0
-
-                # Aguardar elementos específicos com timeout individual
-                wait = WebDriverWait(imovel, 10)
-                
-                # Extrair preço com retry
+            # Função auxiliar para converter preço
+            def converter_preco(texto: str) -> float:
+                numero = texto.replace('R$', '').replace('.', '').replace(',', '.').strip()
                 try:
-                    preco_elemento = wait.until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, 'div.property-card__price'))
-                    )
-                    preco_texto = preco_elemento.text
-                except Exception as e:
-                    self.logger.warning(f"Erro ao extrair preço na tentativa {tentativa + 1}: {e}")
-                    time.sleep(2)
-                    continue
+                    return float(numero)
+                except ValueError:
+                    return 0.0
 
-                # Extrair área com retry
+            # Função auxiliar para converter área
+            def converter_area(texto: str) -> float:
+                numero = texto.replace('m²', '').replace(',', '.').strip()
                 try:
-                    area_elemento = wait.until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, 'span.property-card__detail-area'))
-                    )
-                    area_texto = area_elemento.text
-                except Exception as e:
-                    self.logger.warning(f"Erro ao extrair área na tentativa {tentativa + 1}: {e}")
-                    time.sleep(2)
-                    continue
+                    return float(numero)
+                except ValueError:
+                    return 0.0
 
-                # Converter valores
-                preco = converter_preco(preco_texto)
-                area = converter_area(area_texto)
-                
-                # Calcular preço por m² com validação
-                if area > 0:
-                    preco_m2 = round(preco / area, 2)
-                else:
-                    preco_m2 = 0.0
-                    self.logger.warning(f"Área zero encontrada para imóvel ID {id_global}")
+            # Converte os valores
+            preco = converter_preco(preco_texto)
+            area = converter_area(area_texto)
 
-                # Extrair outros dados com tratamento de erro
-                try:
-                    titulo = wait.until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, 'span.property-card__title'))
-                    ).text
-                except Exception:
-                    titulo = "Título não disponível"
-                    self.logger.warning(f"Título não encontrado para imóvel ID {id_global}")
+            # Calcula o preço por m² com duas casas decimais
+            preco_m2 = round(preco / area, 2) if area > 0 else 0.0
 
-                try:
-                    endereco = wait.until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, 'span.property-card__address'))
-                    ).text
-                except Exception:
-                    endereco = "Endereço não disponível"
-                    self.logger.warning(f"Endereço não encontrado para imóvel ID {id_global}")
-
-                try:
-                    link = wait.until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, 'a.property-card__content-link'))
-                    ).get_attribute('href')
-                except Exception:
-                    link = ""
-                    self.logger.warning(f"Link não encontrado para imóvel ID {id_global}")
-
-                # Montar dicionário de dados
-                dados = {
-                    'id': id_global,
-                    'titulo': titulo,
-                    'endereco': endereco,
-                    'area_m2': area,
-                    'preco_real': preco,
-                    'preco_m2': preco_m2,
-                    'link': link,
-                    'pagina': pagina,
-                    'data_coleta': datetime.now().strftime("%Y-%m-%d"),
-                    'estado': '',
-                    'localidade': ''
-                }
-
-                # Validar dados críticos
-                if preco == 0 or area == 0:
-                    self.logger.warning(f"Dados incompletos para imóvel ID {id_global}: Preço={preco}, Área={area}")
-                    if tentativa < 2:  # Se não for a última tentativa
-                        time.sleep(2)
-                        continue
-
-                return dados
-
-            except Exception as e:
-                self.logger.error(f"Erro ao extrair dados do imóvel na tentativa {tentativa + 1}: {str(e)}")
-                if tentativa < 2:  # Se não for a última tentativa
-                    time.sleep(2)
-                    continue
-                return None
-
-        self.logger.error(f"Falha em todas as tentativas de extrair dados do imóvel ID {id_global}")
-        return None
+            return {
+                'id': id_global,
+                'titulo': imovel.find_element(By.CSS_SELECTOR, 'span.property-card__title').text,
+                'endereco': imovel.find_element(By.CSS_SELECTOR, 'span.property-card__address').text,
+                'area_m2': area,
+                'preco_real': preco,
+                'preco_m2': preco_m2,
+                'link': imovel.find_element(By.CSS_SELECTOR, 'a.property-card__content-link').get_attribute('href'),
+                'pagina': pagina,
+                'data_coleta': datetime.now().strftime("%Y-%m-%d"),
+                'estado': '',
+                'localidade': ''
+            }
+        except Exception as e:
+            self.logger.error(f"Erro ao extrair dados: {str(e)}")
+            return None
 
     def _encontrar_botao_proxima(self, espera: WebDriverWait) -> Optional[webdriver.remote.webelement.WebElement]:
         seletores = [
@@ -300,6 +210,7 @@ class ScraperVivaReal:
         status = st.empty()
     
         try:
+            self.logger.info("Iniciando coleta de dados...")
             navegador = self._configurar_navegador()
             if navegador is None:
                 st.error("Não foi possível inicializar o navegador")
@@ -307,6 +218,7 @@ class ScraperVivaReal:
     
             espera = WebDriverWait(navegador, self.config.tempo_espera)
             navegador.get(self.config.url_base)
+            self.logger.info("Navegador acessou a URL com sucesso")
             
             # Aguarda a página carregar
             time.sleep(self.config.espera_carregamento)
@@ -320,6 +232,7 @@ class ScraperVivaReal:
                 try:
                     status.text(f"⏳ Processando página {pagina}/{num_paginas}")
                     progresso.progress(pagina / num_paginas)
+                    self.logger.info(f"Processando página {pagina}")
                     
                     time.sleep(self.config.espera_carregamento)
                     self._rolar_pagina(navegador)
@@ -411,9 +324,6 @@ def main():
         - Após a coleta, você pode escolher se deseja salvar os dados no banco
         """)
         
-        # Separador visual
-        st.markdown("<hr>", unsafe_allow_html=True)
-        
         # Botão centralizado
         if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
             st.session_state.dados_salvos = False  # Reset estado de salvamento
@@ -425,7 +335,7 @@ def main():
                 
         # Se temos dados coletados
         if st.session_state.df is not None and not st.session_state.df.empty:
-            df = st.session_state.df  # Para facilitar a referência
+            df = st.session_state.df
             
             # Métricas principais
             col1, col2, col3 = st.columns(3)
