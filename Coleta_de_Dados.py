@@ -14,6 +14,7 @@ from selenium.webdriver.chrome.service import Service
 
 # Bibliotecas utilitárias
 import time
+import random
 from datetime import datetime
 import logging
 from typing import Optional, List, Dict
@@ -46,9 +47,9 @@ st.markdown("""
 
 @dataclass
 class ConfiguracaoScraper:
-    tempo_espera: int = 20
-    pausa_rolagem: int = 3
-    espera_carregamento: int = 5
+    tempo_espera: int = 30
+    pausa_rolagem: int = 5
+    espera_carregamento: int = 10
     url_base: str = "https://www.vivareal.com.br/venda/ceara/eusebio/lote-terreno_residencial/#onde=,Cear%C3%A1,Eus%C3%A9bio,,,,,city,BR%3ECeara%3ENULL%3EEusebio,-14.791623,-39.283324,&itl_id=1000183&itl_name=vivareal_-_botao-cta_buscar_to_vivareal_resultado-pesquisa"
     tentativas_max: int = 3
 
@@ -96,9 +97,29 @@ class ScraperVivaReal:
             opcoes_chrome.add_argument('--no-sandbox')
             opcoes_chrome.add_argument('--disable-dev-shm-usage')
             opcoes_chrome.add_argument('--window-size=1920,1080')
+            opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
+            opcoes_chrome.add_argument('--enable-javascript')
+            
+            # Headers mais realistas
+            opcoes_chrome.add_argument('--accept-language=pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7')
+            opcoes_chrome.add_argument('--accept=text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8')
+            
+            # User agent mais realista
+            opcoes_chrome.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
             
             service = Service("/usr/bin/chromedriver")
             navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
+            
+            # Configurações adicionais para evitar detecção
+            navegador.execute_cdp_cmd('Network.setUserAgentOverride', {
+                "userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                "platform": "Windows NT 10.0; Win64; x64"
+            })
+            
+            # Adicionar propriedades ao objeto navigator para parecer mais humano
+            navegador.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            navegador.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['pt-BR', 'pt']})")
+            navegador.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
             
             return navegador
         except Exception as e:
@@ -137,53 +158,111 @@ class ScraperVivaReal:
             return 'Eusébio', 'CE'
 
     def _rolar_pagina(self, navegador: webdriver.Chrome) -> None:
-        for _ in range(3):
-            navegador.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(self.config.pausa_rolagem)
+        try:
+            # Altura total da página
+            altura_total = navegador.execute_script("return document.body.scrollHeight")
+            altura_atual = 0
+            passo = altura_total / 10  # Divide a rolagem em 10 partes
+            
+            for _ in range(10):
+                altura_atual += passo
+                navegador.execute_script(f"window.scrollTo(0, {altura_atual});")
+                time.sleep(random.uniform(0.5, 1.0))  # Pausa aleatória entre rolagens
+                
+            # Volta um pouco para cima para parecer mais natural
+            navegador.execute_script(f"window.scrollTo(0, {altura_total - 200});")
+            time.sleep(1)
+        except Exception as e:
+            self.logger.error(f"Erro ao rolar página: {str(e)}")
 
     def _extrair_dados_imovel(self, imovel: webdriver.remote.webelement.WebElement,
                     id_global: int, pagina: int) -> Optional[Dict]:
         try:
-            # Extrai o texto dos elementos
-            preco_texto = imovel.find_element(By.CSS_SELECTOR, 'div.property-card__price').text
-            area_texto = imovel.find_element(By.CSS_SELECTOR, 'span.property-card__detail-area').text
+            # Aguardar elementos específicos com timeout individual
+            wait = WebDriverWait(imovel, 10)
+            
+            # Extrair preço com retry
+            try:
+                preco_elemento = wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, 'div.property-card__price'))
+                )
+                preco_texto = preco_elemento.text
+            except Exception as e:
+                self.logger.warning(f"Erro ao extrair preço: {e}")
+                return None
 
-            # Função auxiliar para converter preço
+            # Extrair área com retry
+            try:
+                area_elemento = wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, 'span.property-card__detail-area'))
+                )
+                area_texto = area_elemento.text
+            except Exception as e:
+                self.logger.warning(f"Erro ao extrair área: {e}")
+                return None
+
+            # Funções auxiliares para conversão
             def converter_preco(texto: str) -> float:
-                numero = texto.replace('R$', '').replace('.', '').replace(',', '.').strip()
                 try:
+                    numero = texto.replace('R$', '').replace('.', '').replace(',', '.').strip()
                     return float(numero)
-                except ValueError:
+                except (ValueError, AttributeError):
                     return 0.0
 
-            # Função auxiliar para converter área
             def converter_area(texto: str) -> float:
-                numero = texto.replace('m²', '').replace(',', '.').strip()
                 try:
+                    numero = texto.replace('m²', '').replace(',', '.').strip()
                     return float(numero)
-                except ValueError:
+                except (ValueError, AttributeError):
                     return 0.0
 
-            # Converte os valores
+            # Converter valores
             preco = converter_preco(preco_texto)
             area = converter_area(area_texto)
 
-            # Calcula o preço por m² com duas casas decimais
+            # Calcular preço por m² com validação
             preco_m2 = round(preco / area, 2) if area > 0 else 0.0
+
+            try:
+                titulo = wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, 'span.property-card__title'))
+                ).text
+            except Exception:
+                titulo = "Título não disponível"
+
+            try:
+                endereco = wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, 'span.property-card__address'))
+                ).text
+            except Exception:
+                endereco = "Endereço não disponível"
+
+            try:
+                link = wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, 'a.property-card__content-link'))
+                ).get_attribute('href')
+            except Exception:
+                link = ""
+
+            # Validar dados críticos
+            if preco == 0 or area == 0:
+                self.logger.warning(f"Dados incompletos para imóvel ID {id_global}: Preço={preco}, Área={area}")
+                return None
 
             return {
                 'id': id_global,
-                'titulo': imovel.find_element(By.CSS_SELECTOR, 'span.property-card__title').text,
-                'endereco': imovel.find_element(By.CSS_SELECTOR, 'span.property-card__address').text,
+                'titulo': titulo,
+                'endereco': endereco,
                 'area_m2': area,
                 'preco_real': preco,
                 'preco_m2': preco_m2,
-                'link': imovel.find_element(By.CSS_SELECTOR, 'a.property-card__content-link').get_attribute('href'),
+                'link': link,
                 'pagina': pagina,
                 'data_coleta': datetime.now().strftime("%Y-%m-%d"),
                 'estado': '',
                 'localidade': ''
             }
+
         except Exception as e:
             self.logger.error(f"Erro ao extrair dados: {str(e)}")
             return None
@@ -234,11 +313,26 @@ class ScraperVivaReal:
                     progresso.progress(pagina / num_paginas)
                     self.logger.info(f"Processando página {pagina}")
                     
+                    # Pausa aleatória entre páginas
+                    pausa = random.uniform(3, 7)
+                    time.sleep(pausa)
+                    
                     time.sleep(self.config.espera_carregamento)
                     self._rolar_pagina(navegador)
 
-                    imoveis = espera.until(EC.presence_of_all_elements_located(
-                        (By.CSS_SELECTOR, 'div[data-type="property"]')))
+                    # Tenta várias vezes encontrar os imóveis
+                    for tentativa in range(3):
+                        try:
+                            imoveis = espera.until(EC.presence_of_all_elements_located(
+                                (By.CSS_SELECTOR, 'div[data-type="property"]')))
+                            if imoveis:
+                                break
+                            time.sleep(5)
+                        except Exception:
+                            if tentativa == 2:
+                                raise
+                            time.sleep(5)
+                            continue
 
                     if not imoveis:
                         self.logger.warning(f"Sem imóveis na página {pagina}")
@@ -255,7 +349,10 @@ class ScraperVivaReal:
                         botao_proxima = self._encontrar_botao_proxima(espera)
                         if not botao_proxima:
                             break
+                        # Usa JavaScript para clicar no botão
                         navegador.execute_script("arguments[0].click();", botao_proxima)
+                        # Pausa aleatória após clicar no botão
+                        time.sleep(random.uniform(2, 4))
 
                 except Exception as e:
                     self.logger.error(f"Erro na página {pagina}: {str(e)}")
@@ -323,6 +420,9 @@ def main():
         - Apenas terrenos em Eusébio/CE
         - Após a coleta, você pode escolher se deseja salvar os dados no banco
         """)
+        
+        # Separador visual
+        st.markdown("<hr>", unsafe_allow_html=True)
         
         # Botão centralizado
         if st.button("🚀 Iniciar Coleta", type="primary", use_container_width=True):
