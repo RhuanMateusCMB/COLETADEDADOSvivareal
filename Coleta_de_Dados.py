@@ -22,9 +22,6 @@ from dataclasses import dataclass
 # Biblioteca para conexão com Supabase
 from supabase import create_client
 
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service as ChromeService
-
 # Configuração da página Streamlit
 st.set_page_config(
     page_title="CMB - Capital",
@@ -98,13 +95,25 @@ class ScraperVivaReal:
             opcoes_chrome.add_argument('--headless=new')
             opcoes_chrome.add_argument('--no-sandbox')
             opcoes_chrome.add_argument('--disable-dev-shm-usage')
+            opcoes_chrome.add_argument('--disable-gpu')
+            opcoes_chrome.add_argument('--window-size=1920,1080')
+            opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
+            opcoes_chrome.add_argument('--enable-cookies')
+            opcoes_chrome.binary_location = "/usr/bin/chromium"
             
-            # Força a versão 120 do ChromeDriver
-            service = ChromeService(ChromeDriverManager(version="120.0.6099.109").install())
+            service = Service("/usr/bin/chromedriver")
             navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
+
+            # Usando webdriver_manager para gerenciar o ChromeDriver automaticamente
+            #from webdriver_manager.chrome import ChromeDriverManager
+            #from selenium.webdriver.chrome.service import Service as ChromeService
             
-            navegador.set_page_load_timeout(45)
-            navegador.implicitly_wait(30)
+            #service = ChromeService(ChromeDriverManager().install())
+            #navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
+            navegador.execute_cdp_cmd('Network.setUserAgentOverride', {
+                "userAgent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            })
+            navegador.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
             return navegador
         except Exception as e:
