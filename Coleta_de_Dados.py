@@ -46,9 +46,9 @@ st.markdown("""
 
 @dataclass
 class ConfiguracaoScraper:
-    tempo_espera: int = 30  # Aumentar de 20 para 30
-    pausa_rolagem: int = 5  # Aumentar de 3 para 5
-    espera_carregamento: int = 10  # Aumentar de 5 para 10
+    tempo_espera: int = 45
+    pausa_rolagem: int = 8
+    espera_carregamento: int = 15
     url_base: str = "https://www.vivareal.com.br/venda/ceara/eusebio/lote-terreno_residencial/#onde=,Cear%C3%A1,Eus%C3%A9bio,,,,,city,BR%3ECeara%3ENULL%3EEusebio,-14.791623,-39.283324,&itl_id=1000183&itl_name=vivareal_-_botao-cta_buscar_to_vivareal_resultado-pesquisa"
     tentativas_max: int = 3
 
@@ -90,35 +90,32 @@ class ScraperVivaReal:
         return logging.getLogger(__name__)
 
     def _configurar_navegador(self) -> webdriver.Chrome:
-        try:
-            opcoes_chrome = Options()
-            opcoes_chrome.add_argument('--headless=new')
-            opcoes_chrome.add_argument('--no-sandbox')
-            opcoes_chrome.add_argument('--disable-dev-shm-usage')
-            opcoes_chrome.add_argument('--disable-gpu')
-            opcoes_chrome.add_argument('--window-size=1920,1080')
-            opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
-            opcoes_chrome.add_argument('--enable-cookies')
-            opcoes_chrome.binary_location = "/usr/bin/chromium"
-            
-            service = Service("/usr/bin/chromedriver")
-            navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
-
-            # Usando webdriver_manager para gerenciar o ChromeDriver automaticamente
-            #from webdriver_manager.chrome import ChromeDriverManager
-            #from selenium.webdriver.chrome.service import Service as ChromeService
-            
-            #service = ChromeService(ChromeDriverManager().install())
-            #navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
-            navegador.execute_cdp_cmd('Network.setUserAgentOverride', {
-                "userAgent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            })
-            navegador.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-            
-            return navegador
-        except Exception as e:
-            self.logger.error(f"Erro ao configurar navegador: {str(e)}")
-            return None
+       try:
+           opcoes_chrome = Options()
+           # opcoes_chrome.add_argument('--headless=new') # Remover headless para debug
+           opcoes_chrome.add_argument('--no-sandbox')
+           opcoes_chrome.add_argument('--disable-dev-shm-usage')
+           opcoes_chrome.add_argument('--disable-gpu')
+           opcoes_chrome.add_argument('--window-size=1920,1080')
+           opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
+           opcoes_chrome.add_argument('--enable-cookies')
+           opcoes_chrome.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    
+           service = Service("/usr/bin/chromedriver")
+           navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
+           navegador.set_page_load_timeout(45)
+           navegador.implicitly_wait(30)
+           
+           navegador.execute_cdp_cmd('Network.setUserAgentOverride', {
+               "userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+           })
+           navegador.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+           
+           return navegador
+           
+       except Exception as e:
+           self.logger.error(f"Erro ao configurar navegador: {str(e)}")
+           return None
 
     def _capturar_localizacao(self, navegador: webdriver.Chrome) -> tuple:
         if navegador is None:
