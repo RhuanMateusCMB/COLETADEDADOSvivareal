@@ -98,9 +98,9 @@ class ScraperVivaReal:
             opcoes_chrome.add_argument('--headless=new')
             opcoes_chrome.add_argument('--no-sandbox')
             opcoes_chrome.add_argument('--disable-dev-shm-usage')
-            opcoes_chrome.add_argument('--disable-gpu')
             
-            service = ChromeService(ChromeDriverManager().install())
+            # Força a versão 120 do ChromeDriver
+            service = ChromeService(ChromeDriverManager(version="120.0.6099.109").install())
             navegador = webdriver.Chrome(service=service, options=opcoes_chrome)
             
             navegador.set_page_load_timeout(45)
