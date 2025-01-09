@@ -99,6 +99,9 @@ class ScraperVivaReal:
             opcoes_chrome.add_argument('--window-size=1920,1080')
             opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
             opcoes_chrome.add_argument('--enable-cookies')
+            opcoes_chrome.add_argument('--disable-blink-features=AutomationControlled')
+            opcoes_chrome.add_experimental_option('excludeSwitches', ['enable-automation'])
+            opcoes_chrome.add_experimental_option('useAutomationExtension', False)
             opcoes_chrome.binary_location = "/usr/bin/chromium"
             
             service = Service("/usr/bin/chromedriver")
