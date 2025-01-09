@@ -243,9 +243,7 @@ class ScraperVivaReal:
             preco_m2 = round(preco / area, 2) if area > 0 else 0.0
 
             try:
-                titulo = wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, 'h2[class*="title"]'))
-                ).text
+                titulo = imovel.find_element(By.CSS_SELECTOR, 'span.property-card__title').text,  # Correção aqui
             except Exception:
                 titulo = "Título não disponível"
 
