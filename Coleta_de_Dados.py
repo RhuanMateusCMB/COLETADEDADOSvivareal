@@ -47,9 +47,9 @@ st.markdown("""
 
 @dataclass
 class ConfiguracaoScraper:
-    tempo_espera: int = 30
+    tempo_espera: int = 15
     pausa_rolagem: int = 5
-    espera_carregamento: int = 20
+    espera_carregamento: int = 8
     url_base: str = "https://www.vivareal.com.br/venda/ceara/eusebio/lote-terreno_residencial/#onde=,Cear%C3%A1,Eus%C3%A9bio,,,,,city,BR%3ECeara%3ENULL%3EEusebio,-14.791623,-39.283324,&itl_id=1000183&itl_name=vivareal_-_botao-cta_buscar_to_vivareal_resultado-pesquisa"
     tentativas_max: int = 3
 
@@ -181,9 +181,9 @@ class ScraperVivaReal:
             # Altura total da página
             altura_total = navegador.execute_script("return document.body.scrollHeight")
             altura_atual = 0
-            passo = altura_total / 10  # Divide a rolagem em 10 partes
+            passo = altura_total / 4  # Divide a rolagem em 4 partes
             
-            for _ in range(10):
+            for _ in range(4):
                 altura_atual += passo
                 navegador.execute_script(f"window.scrollTo(0, {altura_atual});")
                 time.sleep(random.uniform(0.5, 1.0))  # Pausa aleatória entre rolagens
@@ -347,7 +347,7 @@ class ScraperVivaReal:
                     self.logger.info(f"Processando página {pagina}")
                     
                     # Pausa aleatória entre páginas
-                    pausa = random.uniform(3, 7)
+                    pausa = random.uniform(1, 3)
                     time.sleep(pausa)
                     
                     time.sleep(self.config.espera_carregamento)
@@ -387,7 +387,7 @@ class ScraperVivaReal:
                         # Usa JavaScript para clicar no botão
                         navegador.execute_script("arguments[0].click();", botao_proxima)
                         # Pausa aleatória após clicar no botão
-                        time.sleep(random.uniform(2, 4))
+                        time.sleep(2)
 
                 except Exception as e:
                     self.logger.error(f"Erro na página {pagina}: {str(e)}")
