@@ -47,9 +47,9 @@ st.markdown("""
 
 @dataclass
 class ConfiguracaoScraper:
-    tempo_espera: int = 15
-    pausa_rolagem: int = 5
-    espera_carregamento: int = 8
+    tempo_espera: int = 8
+    pausa_rolagem: int = 2
+    espera_carregamento: int = 4
     url_base: str = "https://www.vivareal.com.br/venda/ceara/eusebio/lote-terreno_residencial/#onde=,Cear%C3%A1,Eus%C3%A9bio,,,,,city,BR%3ECeara%3ENULL%3EEusebio,-14.791623,-39.283324,&itl_id=1000183&itl_name=vivareal_-_botao-cta_buscar_to_vivareal_resultado-pesquisa"
     tentativas_max: int = 3
 
