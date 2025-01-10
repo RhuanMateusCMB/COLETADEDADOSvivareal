@@ -239,7 +239,7 @@ def main():
         st.download_button(
             label="📥 Baixar dados filtrados em CSV",
             data=csv,
-            file_name=f'terrenos_eusebio_filtrados_{datetime.now().strftime("%Y%m%d")}.csv",
+            file_name=f'terrenos_eusebio_filtrados_{datetime.now().strftime("%Y%m%d")}.csv',
             mime='text/csv',
         )
     else:
