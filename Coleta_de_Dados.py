@@ -1,5 +1,6 @@
 # Bibliotecas para interface web
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Bibliotecas para manipulação de dados
 import pandas as pd
@@ -19,6 +20,7 @@ from datetime import datetime
 import logging
 from typing import Optional, List, Dict
 from dataclasses import dataclass
+import hashlib
 
 # Biblioteca para conexão com Supabase
 from supabase import create_client
@@ -42,8 +44,82 @@ st.markdown("""
         padding-top: 2rem;
         padding-bottom: 2rem;
     }
+    .login-container {
+        max-width: 400px;
+        margin: auto;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        background-color: #1E1E1E;
+        border: 1px solid #333;
+    }
+    .login-title {
+        text-align: center;
+        margin-bottom: 2rem;
+        color: #FFFFFF;
+    }
+    /* Estilo para inputs */
+    .stTextInput>div>div>input {
+        background-color: #2D2D2D !important;
+        color: #FFFFFF !important;
+        border: 1px solid #444 !important;
+    }
+    /* Estilo para labels */
+    .stTextInput>label {
+        color: #CCCCCC !important;
+    }
+    /* Estilo para botão de submit */
+    .stButton>button {
+        background-color: #FF4B4B !important;
+        color: white !important;
+        border: none !important;
+        padding: 0.5rem 1rem !important;
+        border-radius: 5px !important;
+        transition: all 0.3s ease !important;
+    }
+    .stButton>button:hover {
+        background-color: #FF3333 !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+    }
+    /* Ajuste da cor do texto */
+    .login-container p {
+        color: #CCCCCC !important;
+    }
     </style>
     """, unsafe_allow_html=True)
+
+# Constantes de autenticação
+EMAIL_CORRETO = "admincmbcapital@admin.com.br"
+SENHA_CORRETA = "Admin2025@cmbcapital"
+
+def check_login():
+    """Verifica se o usuário está logado"""
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+
+def login_page():
+    """Renderiza a página de login"""
+    st.markdown("""
+        <div class="login-container">
+            <h1 class="login-title">🏗️ CMB Capital</h1>
+            <p style='text-align: center; color: #666;'>Sistema de Coleta de Dados</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("login_form"):
+        email = st.text_input("Email", key="email")
+        password = st.text_input("Senha", type="password", key="password")
+        submit = st.form_submit_button("Entrar")
+
+        if submit:
+            db = SupabaseManager()
+            if db.verificar_credenciais(email, password):
+                st.session_state.logged_in = True
+                st.session_state.user_email = email
+                st.rerun()
+            else:
+                st.error("Email ou senha incorretos!")
+
 
 @dataclass
 class ConfiguracaoScraper:
@@ -59,12 +135,28 @@ class SupabaseManager:
         self.key = st.secrets["SUPABASE_KEY"]
         self.supabase = create_client(self.url, self.key)
 
+    def verificar_credenciais(self, email: str, senha: str) -> bool:
+        try:
+            # Hash da senha para comparação segura
+            senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+            
+            # Busca o usuário com o email fornecido
+            response = self.supabase.table('usuarios').select('*').eq('email', email).execute()
+            
+            if response.data and len(response.data) > 0:
+                usuario = response.data[0]
+                return usuario['senha_hash'] == senha_hash
+            return False
+        except Exception as e:
+            st.error(f"Erro ao verificar credenciais: {str(e)}")
+            return False
+
     def limpar_tabela(self):
-        self.supabase.table('imoveisatual').delete().neq('id', 0).execute()
+        self.supabase.table('teste').delete().neq('id', 0).execute()
 
     def inserir_dados(self, df):
         # Primeiro, pegamos o maior ID atual na tabela
-        result = self.supabase.table('imoveisatual').select('id').order('id.desc').limit(1).execute()
+        result = self.supabase.table('teste').select('id').order('id.desc').limit(1).execute()
         ultimo_id = result.data[0]['id'] if result.data else 0
         
         # Ajustamos os IDs do novo dataframe
@@ -75,7 +167,7 @@ class SupabaseManager:
         
         # Agora inserimos os dados
         registros = df.to_dict('records')
-        self.supabase.table('imoveisatual').insert(registros).execute()
+        self.supabase.table('teste').insert(registros).execute()
 
 class ScraperVivaReal:
     def __init__(self, config: ConfiguracaoScraper):
@@ -147,10 +239,8 @@ class ScraperVivaReal:
 
     def _capturar_localizacao(self, navegador: webdriver.Chrome) -> tuple:
         try:
-            # Espera a página carregar completamente
             time.sleep(self.config.espera_carregamento)
 
-            # Primeira tentativa: buscar pelo seletor CSS
             try:
                 localizacao_elemento = WebDriverWait(navegador, self.config.tempo_espera).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, '.search-input-location'))
@@ -163,13 +253,11 @@ class ScraperVivaReal:
             except Exception:
                 pass
     
-            # Segunda tentativa: extrair da URL
             url_parts = navegador.current_url.split('/')
             for i, part in enumerate(url_parts):
                 if part == 'ceara':
                     return 'Eusébio', 'CE'
                     
-            # Terceira tentativa: valor padrão para Eusébio
             return 'Eusébio', 'CE'
     
         except Exception as e:
@@ -178,17 +266,15 @@ class ScraperVivaReal:
 
     def _rolar_pagina(self, navegador: webdriver.Chrome) -> None:
         try:
-            # Altura total da página
             altura_total = navegador.execute_script("return document.body.scrollHeight")
             altura_atual = 0
-            passo = altura_total / 4  # Divide a rolagem em 4 partes
+            passo = altura_total / 4
             
             for _ in range(4):
                 altura_atual += passo
                 navegador.execute_script(f"window.scrollTo(0, {altura_atual});")
-                time.sleep(random.uniform(0.5, 1.0))  # Pausa aleatória entre rolagens
+                time.sleep(random.uniform(0.5, 1.0))
                 
-            # Volta um pouco para cima para parecer mais natural
             navegador.execute_script(f"window.scrollTo(0, {altura_total - 200});")
             time.sleep(1)
         except Exception as e:
@@ -197,10 +283,8 @@ class ScraperVivaReal:
     def _extrair_dados_imovel(self, imovel: webdriver.remote.webelement.WebElement,
                     id_global: int, pagina: int) -> Optional[Dict]:
         try:
-            # Aguardar elementos específicos com timeout individual
             wait = WebDriverWait(imovel, 10)
             
-            # Extrair preço com retry
             try:
                 preco_elemento = wait.until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, 'div[class*="price"]'))
@@ -210,7 +294,6 @@ class ScraperVivaReal:
                 self.logger.warning(f"Erro ao extrair preço: {e}")
                 return None
 
-            # Extrair área com retry
             try:
                 area_elemento = wait.until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, 'span[class*="detail-area"]'))
@@ -220,7 +303,6 @@ class ScraperVivaReal:
                 self.logger.warning(f"Erro ao extrair área: {e}")
                 return None
 
-            # Funções auxiliares para conversão
             def converter_preco(texto: str) -> float:
                 try:
                     numero = texto.replace('R$', '').replace('.', '').replace(',', '.').strip()
@@ -235,15 +317,12 @@ class ScraperVivaReal:
                 except (ValueError, AttributeError):
                     return 0.0
 
-            # Converter valores
             preco = converter_preco(preco_texto)
             area = converter_area(area_texto)
-
-            # Calcular preço por m² com validação
             preco_m2 = round(preco / area, 2) if area > 0 else 0.0
 
             try:
-                titulo = imovel.find_element(By.CSS_SELECTOR, 'span.property-card__title').text,  # Correção aqui
+                titulo = imovel.find_element(By.CSS_SELECTOR, 'span.property-card__title').text
             except Exception:
                 titulo = "Título não disponível"
 
@@ -261,7 +340,6 @@ class ScraperVivaReal:
             except Exception:
                 link = ""
 
-            # Validar dados críticos
             if preco == 0 or area == 0:
                 self.logger.warning(f"Dados incompletos para imóvel ID {id_global}: Preço={preco}, Área={area}")
                 return None
@@ -317,13 +395,11 @@ class ScraperVivaReal:
             navegador.get(self.config.url_base)
             self.logger.info("Navegador acessou a URL com sucesso")
             
-            # Aguarda página carregar completamente
-            for _ in range(30):  # 30 segundos de tentativa
+            for _ in range(30):
                 if self._verificar_pagina_carregada(navegador):
                     break
                 time.sleep(1)
             
-            # Verificar se a lista de resultados está presente
             try:
                 lista_resultados = espera.until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, 'div.results-list'))
@@ -344,14 +420,12 @@ class ScraperVivaReal:
                     progresso.progress(pagina / num_paginas)
                     self.logger.info(f"Processando página {pagina}")
                     
-                    # Pausa aleatória entre páginas
                     pausa = random.uniform(1, 3)
                     time.sleep(pausa)
                     
                     time.sleep(self.config.espera_carregamento)
                     self._rolar_pagina(navegador)
 
-                    # Tenta várias vezes encontrar os imóveis
                     imoveis = None
                     for tentativa in range(3):
                         try:
@@ -382,9 +456,7 @@ class ScraperVivaReal:
                         botao_proxima = self._encontrar_botao_proxima(espera)
                         if not botao_proxima:
                             break
-                        # Usa JavaScript para clicar no botão
                         navegador.execute_script("arguments[0].click();", botao_proxima)
-                        # Pausa aleatória após clicar no botão
                         time.sleep(2)
 
                 except Exception as e:
@@ -407,11 +479,26 @@ class ScraperVivaReal:
 
 def main():
     try:
+        # Verifica o estado do login
+        check_login()
+
+        # Se não estiver logado, mostra a página de login
+        if not st.session_state.logged_in:
+            login_page()
+            return
+
         # Inicializar session_state
         if 'df' not in st.session_state:
             st.session_state.df = None
         if 'dados_salvos' not in st.session_state:
             st.session_state.dados_salvos = False
+            
+        # Adiciona botão de logout no canto superior direito
+        col1, col2 = st.columns([6, 1])
+        with col2:
+            if st.button("Logout"):
+                st.session_state.logged_in = False
+                st.rerun()
             
         # Títulos e descrição
         st.title("🏗️ Coleta Informações Gerais Terrenos - Eusebio, CE")
@@ -421,28 +508,6 @@ def main():
             <p style='font-size: 1.2em; color: #666;'>
                 Coleta de dados de terrenos à venda em Eusébio, Ceará
             </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Botão para o Looker Studio
-        st.markdown("""
-        <div style='text-align: center; padding: 1rem 0;'>
-            <a href='https://lookerstudio.google.com/reporting/105d6f24-d91f-4953-875c-3d4cc45a8fda' target='_blank'>
-                <button style='
-                    background-color: #FF4B4B;
-                    color: white;
-                    padding: 12px 24px;
-                    border: none;
-                    border-radius: 8px;
-                    font-size: 18px;
-                    cursor: pointer;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                    transition: all 0.3s ease;
-                    margin: 10px 0;
-                '>
-                    📊 Acessar Dashboard no Looker Studio
-                </button>
-            </a>
         </div>
         """, unsafe_allow_html=True)
         
@@ -535,6 +600,41 @@ def main():
                 <p>Desenvolvido com ❤️ por Rhuan Mateus - CMB Capital</p>
                 <p style='font-size: 0.8em;'>Última atualização: Janeiro 2025</p>
             </div>
+        """, unsafe_allow_html=True)
+
+        # Separador visual para o relatório
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("## 📊 Relatório Detalhado")
+        
+        # Incorporação do relatório do Looker Studio
+        st.components.v1.iframe(
+            src="https://lookerstudio.google.com/embed/reporting/105d6f24-d91f-4953-875c-3d4cc45a8fda/page/BRhaE",
+            width=1200,
+            height=800,
+            scrolling=True
+        )
+        
+        # Botão alternativo para abrir em nova aba
+        st.markdown("""
+        <div style='text-align: center; padding: 1rem 0;'>
+            <p style='font-size: 0.9em; color: #666;'>Preferir ver em tela cheia?</p>
+            <a href='https://lookerstudio.google.com/reporting/105d6f24-d91f-4953-875c-3d4cc45a8fda' target='_blank'>
+                <button style='
+                    background-color: #FF4B4B;
+                    color: white;
+                    padding: 8px 16px;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                    transition: all 0.3s ease;
+                    margin: 5px 0;
+                '>
+                    📊 Abrir em Nova Aba
+                </button>
+            </a>
+        </div>
         """, unsafe_allow_html=True)
         
     except Exception as e:
