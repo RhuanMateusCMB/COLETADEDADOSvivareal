@@ -152,11 +152,11 @@ class SupabaseManager:
             return False
 
     def limpar_tabela(self):
-        self.supabase.table('teste').delete().neq('id', 0).execute()
+        self.supabase.table('imoveisatual').delete().neq('id', 0).execute()
 
     def inserir_dados(self, df):
         # Primeiro, pegamos o maior ID atual na tabela
-        result = self.supabase.table('teste').select('id').order('id.desc').limit(1).execute()
+        result = self.supabase.table('imoveisatual').select('id').order('id.desc').limit(1).execute()
         ultimo_id = result.data[0]['id'] if result.data else 0
         
         # Ajustamos os IDs do novo dataframe
@@ -167,7 +167,7 @@ class SupabaseManager:
         
         # Agora inserimos os dados
         registros = df.to_dict('records')
-        self.supabase.table('teste').insert(registros).execute()
+        self.supabase.table('imoveisatual').insert(registros).execute()
 
 class ScraperVivaReal:
     def __init__(self, config: ConfiguracaoScraper):
