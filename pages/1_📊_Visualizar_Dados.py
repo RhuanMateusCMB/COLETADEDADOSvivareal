@@ -198,8 +198,19 @@ def main():
                 'plot_bgcolor': '#1E1E1E',
                 'paper_bgcolor': '#1E1E1E',
                 'font': {'color': '#FFFFFF'},
-                'xaxis': {'gridcolor': '#333333'},
-                'yaxis': {'gridcolor': '#333333'}
+                'xaxis': {
+                    'gridcolor': '#333333',
+                    'color': '#FFFFFF',
+                    'title_font': {'color': '#FFFFFF'}
+                },
+                'yaxis': {
+                    'gridcolor': '#333333',
+                    'color': '#FFFFFF',
+                    'title_font': {'color': '#FFFFFF'}
+                },
+                'title': {
+                    'font': {'color': '#FFFFFF'}
+                }
             }
         }
 
@@ -244,9 +255,9 @@ def main():
             title='Relação entre Área e Preço',
             labels={'area_m2': 'Área (m²)', 'preco_real': 'Preço (R$)'},
             hover_data=['endereco', 'preco_m2'],
-            template='plotly_dark'
+            color_discrete_sequence=['#FF4B4B']
         )
-        fig_scatter.update_layout(template_plotly['layout'])
+        fig_scatter.update_layout(**template_plotly['layout'])
         st.plotly_chart(fig_scatter, use_container_width=True)
 
         # Distribuição de preços por m²
@@ -256,9 +267,9 @@ def main():
             title='Distribuição de Preços por m²',
             labels={'preco_m2': 'Preço por m² (R$)', 'count': 'Quantidade'},
             nbins=30,
-            template='plotly_dark'
+            color_discrete_sequence=['#FF4B4B']
         )
-        fig_hist.update_layout(template_plotly['layout'])
+        fig_hist.update_layout(**template_plotly['layout'])
         st.plotly_chart(fig_hist, use_container_width=True)
 
         # Tabela de dados
