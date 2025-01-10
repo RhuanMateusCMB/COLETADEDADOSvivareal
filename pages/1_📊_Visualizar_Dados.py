@@ -109,7 +109,7 @@ class SupabaseManager:
 
     def obter_dados(self):
         try:
-            response = self.supabase.table('teste').select("*").execute()
+            response = self.supabase.table('imoveisatual').select("*").execute()
             return pd.DataFrame(response.data)
         except Exception as e:
             st.error(f"Erro ao obter dados do Supabase: {str(e)}")
