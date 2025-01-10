@@ -192,27 +192,12 @@ def main():
             preco_m2_medio = df['preco_m2'].mean()
             st.metric("Preço/m² Médio", f"R$ {preco_m2_medio:,.2f}")
 
-        # Configuração do tema para os gráficos Plotly
-        template_plotly = {
-            'layout': {
-                'plot_bgcolor': '#1E1E1E',
-                'paper_bgcolor': '#1E1E1E',
-                'font': {'color': '#FFFFFF'},
-                'xaxis': {
-                    'gridcolor': '#333333',
-                    'color': '#FFFFFF',
-                    'title_font': {'color': '#FFFFFF'}
-                },
-                'yaxis': {
-                    'gridcolor': '#333333',
-                    'color': '#FFFFFF',
-                    'title_font': {'color': '#FFFFFF'}
-                },
-                'title': {
-                    'font': {'color': '#FFFFFF'}
-                }
-            }
-        }
+        # Configuração básica dos gráficos
+        config_graficos = dict(
+            template="plotly",
+            width=800,
+            height=500
+        )
 
         # Filtros
         st.markdown("### 🔍 Filtros")
@@ -247,30 +232,57 @@ def main():
         # Visualizações
         st.markdown("### 📈 Visualizações")
         
-        # Gráfico de dispersão: Preço x Área
-        fig_scatter = px.scatter(
-            df_filtrado,
-            x='area_m2',
-            y='preco_real',
-            title='Relação entre Área e Preço',
-            labels={'area_m2': 'Área (m²)', 'preco_real': 'Preço (R$)'},
-            hover_data=['endereco', 'preco_m2'],
-            color_discrete_sequence=['#FF4B4B']
-        )
-        fig_scatter.update_layout(**template_plotly['layout'])
-        st.plotly_chart(fig_scatter, use_container_width=True)
+        try:
+            # Gráfico de dispersão: Preço x Área
+            fig_scatter = px.scatter(
+                df_filtrado,
+                x='area_m2',
+                y='preco_real',
+                title='Relação entre Área e Preço',
+                labels={'area_m2': 'Área (m²)', 'preco_real': 'Preço (R$)'},
+                hover_data=['endereco', 'preco_m2'],
+                color_discrete_sequence=['#FF4B4B'],
+                **config_graficos
+            )
+            
+            # Personalização adicional do layout
+            fig_scatter.update_layout(
+                plot_bgcolor='#1E1E1E',
+                paper_bgcolor='#1E1E1E',
+                font=dict(color='white'),
+                xaxis=dict(gridcolor='#333333'),
+                yaxis=dict(gridcolor='#333333')
+            )
+            
+            st.plotly_chart(fig_scatter, use_container_width=True)
 
-        # Distribuição de preços por m²
-        fig_hist = px.histogram(
-            df_filtrado,
-            x='preco_m2',
-            title='Distribuição de Preços por m²',
-            labels={'preco_m2': 'Preço por m² (R$)', 'count': 'Quantidade'},
-            nbins=30,
-            color_discrete_sequence=['#FF4B4B']
-        )
-        fig_hist.update_layout(**template_plotly['layout'])
-        st.plotly_chart(fig_hist, use_container_width=True)
+            # Distribuição de preços por m²
+            fig_hist = px.histogram(
+                df_filtrado,
+                x='preco_m2',
+                title='Distribuição de Preços por m²',
+                labels={'preco_m2': 'Preço por m² (R$)', 'count': 'Quantidade'},
+                nbins=30,
+                color_discrete_sequence=['#FF4B4B'],
+                **config_graficos
+            )
+            
+            # Personalização adicional do layout
+            fig_hist.update_layout(
+                plot_bgcolor='#1E1E1E',
+                paper_bgcolor='#1E1E1E',
+                font=dict(color='white'),
+                xaxis=dict(gridcolor='#333333'),
+                yaxis=dict(gridcolor='#333333')
+            )
+            
+            st.plotly_chart(fig_hist, use_container_width=True)
+        
+        except Exception as e:
+            st.error(f"Erro ao gerar os gráficos: {str(e)}")
+            # Para debug
+            st.write("Dados do DataFrame:")
+            st.write(df_filtrado.head())
 
         # Tabela de dados
         st.markdown("### 📋 Dados Detalhados")
