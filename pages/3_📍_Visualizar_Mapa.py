@@ -138,7 +138,7 @@ def main():
 
     # Incorporar o iframe do Looker Studio
     components.iframe(
-        src="https://lookerstudio.google.com/embed/reporting/3eb69112-e085-487f-a9b0-ed395f9248dc/page/oEPdE",
+        src="https://lookerstudio.google.com/embed/reporting/1993eda4-0cea-4c8f-9e83-2d8db92f6763/page/rtPdE",
         width=None,
         height=800,
         scrolling=True
@@ -148,7 +148,7 @@ def main():
     st.markdown("""
     <div style='text-align: center; padding: 1rem 0;'>
         <p style='font-size: 0.9em; color: #666;'>Preferir ver em tela cheia?</p>
-        <a href='https://lookerstudio.google.com/reporting/3eb69112-e085-487f-a9b0-ed395f9248dc' target='_blank'>
+        <a href='https://lookerstudio.google.com/reporting/1993eda4-0cea-4c8f-9e83-2d8db92f6763' target='_blank'>
             <button style='
                 background-color: #FF4B4B;
                 color: white;
